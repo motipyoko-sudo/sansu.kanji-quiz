@@ -51,6 +51,51 @@
             padding: 0 2px;
         }
 
+        .btn-answer {
+            transition: transform 0.1s, box-shadow 0.1s, background-color 0.2s, border-color 0.2s;
+            box-shadow: 0 4px 0 #cbd5e1;
+            /* slate-300 */
+        }
+
+        .btn-answer:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0 #94a3b8;
+            /* slate-400 */
+        }
+
+        .btn-answer:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 transparent;
+        }
+
+        /* 判定後の状態：押せない＆影なし（または浅い影） */
+        .btn-answer.is-correct {
+            background-color: #d1fae5 !important;
+            border-color: #34d399 !important;
+            color: #047857 !important;
+            box-shadow: 0 0 0 transparent;
+            transform: translateY(4px);
+            pointer-events: none;
+        }
+
+        .btn-answer.is-wrong {
+            background-color: #ffe4e6 !important;
+            border-color: #fb7185 !important;
+            color: #be123c !important;
+            box-shadow: 0 0 0 transparent;
+            transform: translateY(4px);
+            pointer-events: none;
+        }
+
+        .btn-answer.is-highlight {
+            background-color: #ecfdf5 !important;
+            border-color: #6ee7b7 !important;
+            color: #059669 !important;
+            box-shadow: 0 4px 0 #a7f3d0 !important;
+            transform: translateY(0);
+            pointer-events: none;
+        }
+
         /* アニメーション用クラス */
         @keyframes pop {
             0% {
@@ -70,6 +115,39 @@
 
         .animate-pop {
             animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes fadeInScale {
+            0% {
+                opacity: 0;
+                transform: scale(0.95) translateY(10px);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fadeInScale 0.4s ease-out forwards;
+        }
+
+        /* テキストが一瞬光るエフェクト */
+        .text-glow-correct {
+            color: #10b981 !important;
+            /* emerald-500 */
+            text-shadow: 0 0 15px rgba(16, 185, 129, 0.5);
+            transform: scale(1.05);
+            transition: all 0.2s ease;
+        }
+
+        .text-glow-wrong {
+            color: #f43f5e !important;
+            /* rose-500 */
+            text-shadow: 0 0 15px rgba(244, 63, 94, 0.5);
+            transform: scale(1.05);
+            transition: all 0.2s ease;
         }
     </style>
 </head>
@@ -694,8 +772,15 @@
             document.getElementById('total-q').textContent = totalQs;
             document.getElementById('category-badge').textContent = q.category;
 
-            // 問題文表示
-            document.getElementById('question-text').innerHTML = q.qHtml;
+            // 問題文表示（アニメーションリセットのためクラスを付け直す）
+            const qText = document.getElementById('question-text');
+            qText.innerHTML = q.qHtml;
+            qText.classList.remove('animate-fade-in', 'text-glow-correct', 'text-glow-wrong');
+            // リフローを強制してアニメーションを再実行
+            void qText.offsetWidth;
+            qText.style.transition = ''; // reset glow transition
+            qText.style.transform = '';
+            qText.classList.add('animate-fade-in');
 
             // ヒント表示 (廃止)
             const hintEl = document.getElementById('question-hint');
@@ -708,7 +793,7 @@
 
             q.options.forEach(opt => {
                 const btn = document.createElement('button');
-                btn.className = 'w-full min-h-[4.5rem] bg-white border-2 border-slate-100 text-slate-600 font-bold py-4 px-4 rounded-2xl text-xl sm:text-2xl shadow-sm hover:border-sky-300 hover:text-sky-600 hover:bg-sky-50 transition-colors duration-200 relative overflow-hidden active:scale-[0.98] active:bg-sky-100 break-words flex items-center justify-center';
+                btn.className = 'btn-answer w-full min-h-[4.5rem] bg-white border-2 border-slate-200 text-slate-600 font-bold py-4 px-4 rounded-2xl text-xl sm:text-2xl break-words flex items-center justify-center hover:border-sky-300 hover:text-sky-600 hover:bg-sky-50';
 
                 // タッチデバイスでの反応を良くする
                 btn.style.touchAction = 'manipulation';
@@ -747,18 +832,20 @@
 
                 feedbackIcon.textContent = '⭕';
                 feedbackIcon.className = 'text-9xl drop-shadow-2xl filter text-emerald-400 animate-popup';
-                btnElement.className = 'w-full min-h-[4.5rem] bg-emerald-100 border-2 border-emerald-400 text-emerald-700 font-bold py-4 px-4 rounded-2xl text-xl sm:text-2xl shadow-none break-words flex items-center justify-center';
+                btnElement.classList.add('is-correct');
+                document.getElementById('question-text').classList.add('text-glow-correct'); // テキストを緑に光らせる
                 fireMatchFireworks(); // 正解時に花火発射！
             } else {
                 playIncorrectSound();
                 feedbackIcon.textContent = '❌';
                 feedbackIcon.className = 'text-9xl drop-shadow-2xl filter text-rose-400 animate-popup';
-                btnElement.className = 'w-full min-h-[4.5rem] bg-rose-100 border-2 border-rose-400 text-rose-700 font-bold py-4 px-4 rounded-2xl text-xl sm:text-2xl shadow-none break-words flex items-center justify-center';
+                btnElement.classList.add('is-wrong');
+                document.getElementById('question-text').classList.add('text-glow-wrong'); // テキストを赤に光らせる
 
                 // 正解のボタンをハイライト
                 btns.forEach(b => {
                     if (b.innerHTML == correct) {
-                        b.className = 'w-full min-h-[4.5rem] bg-emerald-50 border-2 border-emerald-300 text-emerald-600 font-bold py-4 px-4 rounded-2xl text-xl sm:text-2xl shadow-sm break-words flex items-center justify-center';
+                        b.classList.add('is-highlight');
                     }
                 });
             }
@@ -891,24 +978,72 @@
         }
 
         // --- エフェクト ---
-        // 正解時の花火
         function fireMatchFireworks() {
-            const count = 40;
-            const defaults = {
-                origin: { y: 0.5, x: 0.5 },
-                zIndex: 100
-            };
+            const duration = 1000;
+            const end = Date.now() + duration;
+            const colors = ['#FF1493', '#00FFFF', '#FFD700', '#32CD32', '#FF4500'];
 
-            // 放射状に広がる花火
-            confetti(Object.assign({}, defaults, {
-                particleCount: count,
-                spread: 360,
-                startVelocity: 30,
-                colors: ['#FFD700', '#FFA500', '#00BFFF', '#FF69B4'], // カラフルに
-                scalar: 0.8,
-                gravity: 0.8,
-                ticks: 100
-            }));
+            (function frame() {
+                // 左下から
+                confetti({
+                    particleCount: 5,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0, y: 0.8 },
+                    colors: colors,
+                    zIndex: 100,
+                    scalar: 1.2,
+                    shapes: ['square', 'circle'],
+                });
+                // 右下から
+                confetti({
+                    particleCount: 5,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1, y: 0.8 },
+                    colors: colors,
+                    zIndex: 100,
+                    scalar: 1.2,
+                    shapes: ['square', 'circle'],
+                });
+
+                // --- 追加：紙テープ（リボン状の細長いパーティクル） ---
+                // 左から
+                confetti({
+                    particleCount: 2, // テープは少なめ
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0, y: 0.8 },
+                    colors: colors,
+                    zIndex: 100,
+                    ticks: 200,       // 長く残るように
+                    scalar: 2,        // 少し大きく
+                    shapes: ['square'], // 四角を細長くする（CSSでは直接リボンを作れないので比率で表現は不可、canvas-confettiでは通常細長い四角が混ざる設定はないためスカラーでやや大きくする）
+                    // 実際には canvas-confetti は星や丸、四角の混在のみサポートします。
+                    // より「テープっぽく」見せるために、落ちる速度を遅く、ヒラヒラ感を出す（gravity, drift など）
+                    gravity: 0.4,
+                    drift: 1
+                });
+                // 右から
+                confetti({
+                    particleCount: 2,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1, y: 0.8 },
+                    colors: colors,
+                    zIndex: 100,
+                    ticks: 200,
+                    scalar: 2,
+                    shapes: ['square'],
+                    gravity: 0.4,
+                    drift: -1
+                });
+
+
+                if (Date.now() < end) {
+                    requestAnimationFrame(frame);
+                }
+            }());
         }
 
         function fireConfetti() {
