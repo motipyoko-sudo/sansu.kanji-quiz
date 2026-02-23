@@ -979,14 +979,22 @@
 
         // --- エフェクト ---
         function fireMatchFireworks() {
-            const duration = 1000;
+            // スマホかどうかの簡易判定（画面幅で判断）
+            const isMobile = window.innerWidth <= 768;
+
+            // スマホの場合は量を減らし、寿命を短くしてフェードアウトしやすくする
+            const baseCount = isMobile ? 3 : 5;
+            const tapeCount = isMobile ? 1 : 2;
+            const ticks = isMobile ? 150 : 200;
+
+            const duration = 800; // スマホでの負荷を考慮して少し短めに
             const end = Date.now() + duration;
             const colors = ['#FF1493', '#00FFFF', '#FFD700', '#32CD32', '#FF4500'];
 
             (function frame() {
                 // 左下から
                 confetti({
-                    particleCount: 5,
+                    particleCount: baseCount,
                     angle: 60,
                     spread: 55,
                     origin: { x: 0, y: 0.8 },
@@ -994,10 +1002,12 @@
                     zIndex: 100,
                     scalar: 1.2,
                     shapes: ['square', 'circle'],
+                    decay: 0.92, // フェードアウト（減速→消滅）を滑らかにする
+                    ticks: ticks
                 });
                 // 右下から
                 confetti({
-                    particleCount: 5,
+                    particleCount: baseCount,
                     angle: 120,
                     spread: 55,
                     origin: { x: 1, y: 0.8 },
@@ -1005,40 +1015,39 @@
                     zIndex: 100,
                     scalar: 1.2,
                     shapes: ['square', 'circle'],
+                    decay: 0.92,
+                    ticks: ticks
                 });
 
-                // --- 追加：紙テープ（リボン状の細長いパーティクル） ---
-                // 左から
+                // --- 紙テープ（リボン状） ---
                 confetti({
-                    particleCount: 2, // テープは少なめ
+                    particleCount: tapeCount,
                     angle: 60,
                     spread: 55,
                     origin: { x: 0, y: 0.8 },
                     colors: colors,
                     zIndex: 100,
-                    ticks: 200,       // 長く残るように
-                    scalar: 2,        // 少し大きく
-                    shapes: ['square'], // 四角を細長くする（CSSでは直接リボンを作れないので比率で表現は不可、canvas-confettiでは通常細長い四角が混ざる設定はないためスカラーでやや大きくする）
-                    // 実際には canvas-confetti は星や丸、四角の混在のみサポートします。
-                    // より「テープっぽく」見せるために、落ちる速度を遅く、ヒラヒラ感を出す（gravity, drift など）
+                    ticks: ticks,
+                    scalar: 2,
+                    shapes: ['square'],
                     gravity: 0.4,
-                    drift: 1
+                    drift: 1,
+                    decay: 0.92
                 });
-                // 右から
                 confetti({
-                    particleCount: 2,
+                    particleCount: tapeCount,
                     angle: 120,
                     spread: 55,
                     origin: { x: 1, y: 0.8 },
                     colors: colors,
                     zIndex: 100,
-                    ticks: 200,
+                    ticks: ticks,
                     scalar: 2,
                     shapes: ['square'],
                     gravity: 0.4,
-                    drift: -1
+                    drift: -1,
+                    decay: 0.92
                 });
-
 
                 if (Date.now() < end) {
                     requestAnimationFrame(frame);
