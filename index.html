@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>毎日学習チャレンジ</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Optional: if we want charts later, but let's stick to simple text for now -->
+    <style>
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif;
+            touch-action: manipulation;
+            /* ダブルタップズーム防止 */
+            background-color: #f0f9ff;
+            /* sky-50 */
+        }
+
+        .btn-press {
+            transition: transform 0.1s, box-shadow 0.1s;
+            box-shadow: 0 4px 0 #0ea5e9;
+            /* sky-500 shadow */
+        }
+
+        .btn-press:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #0ea5e9;
+        }
+
+        .fraction {
+            display: inline-block;
+            text-align: center;
+            vertical-align: middle;
+            font-size: 0.9em;
+        }
+
+        .numerator {
+            border-bottom: 2px solid currentColor;
+            display: block;
+            padding: 0 2px;
+        }
+
+        .denominator {
+            display: block;
+            padding: 0 2px;
+        }
+
+        /* アニメーション用クラス */
+        @keyframes pop {
+            0% {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .animate-pop {
+            animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-gradient-to-br from-yellow-200 via-orange-100 to-pink-200 text-slate-700 min-h-screen flex items-center justify-center p-4">
+
+    <!-- アプリコンテナ -->
+    <div id="app"
+        class="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden min-h-[600px] relative flex flex-col border-4 border-white">
+
+        <!-- ヘッダー -->
+        <header class="bg-sky-400 p-4 text-white text-center shadow-md z-10">
+            <h1 class="text-xl font-bold tracking-wider">毎日学習チャレンジ</h1>
+        </header>
+
+        <!-- スタート画面 -->
+        <div id="start-screen"
+            class="flex-1 flex flex-col items-center justify-center p-8 space-y-8 absolute inset-0 bg-white z-20 transition-opacity duration-300">
+            <div class="text-center space-y-2">
+                <span class="text-6xl">✨</span>
+                <h2 class="text-2xl font-bold text-sky-600">今日のクエスト</h2>
+                <p class="text-slate-500">算数5問 & 漢字3文字</p>
+            </div>
+
+            <div class="bg-sky-50 p-6 rounded-2xl w-full space-y-3">
+                <div class="flex items-center space-x-3">
+                    <span class="bg-indigo-100 text-indigo-600 p-2 rounded-lg text-xl">🔢</span>
+                    <div>
+                        <p class="font-bold text-slate-700">算数アタック</p>
+                        <p class="text-xs text-slate-500">分数・小数・割合</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <span class="bg-rose-100 text-rose-600 p-2 rounded-lg text-xl">✍️</span>
+                    <div>
+                        <p class="font-bold text-slate-700">漢字マスター</p>
+                        <p class="text-xs text-slate-500">小学5・6年生レベル</p>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="startGame()"
+                class="w-full min-h-[5rem] bg-sky-500 hover:bg-sky-400 text-white font-bold py-4 px-8 rounded-2xl text-xl sm:text-2xl shadow-lg transform transition hover:-translate-y-1 hover:shadow-xl btn-press flex items-center justify-center">
+                スタート！
+            </button>
+        </div>
+
+        <!-- ゲーム画面 -->
+        <div id="game-screen" class="hidden flex-1 flex flex-col p-6 z-10">
+            <!-- 進捗バー -->
+            <div class="mb-6">
+                <div class="flex justify-between text-sm font-bold text-slate-400 mb-2">
+                    <span id="category-badge">算数</span>
+                    <span><span id="current-q">1</span> / <span id="total-q">8</span></span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                    <div id="progress-bar" class="bg-sky-400 h-3 rounded-full transition-all duration-500"
+                        style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- 問題エリア -->
+            <div class="flex-1 flex flex-col items-center justify-center mb-8 relative">
+                <!-- 正解/不正解フィードバック -->
+                <div id="feedback"
+                    class="hidden absolute inset-0 flex items-center justify-center z-50 pointer-events-none">
+                    <span id="feedback-icon" class="text-9xl drop-shadow-lg filter"></span>
+                </div>
+
+                <div id="question-text" class="text-3xl font-bold text-center text-slate-800 leading-relaxed w-full">
+                    <!-- 問題がここに挿入されます -->
+                </div>
+                <div id="question-hint" class="mt-4 text-sm text-slate-500 bg-slate-100 px-3 py-1 rounded-full hidden">
+                    <!-- ヒント -->
+                </div>
+            </div>
+
+            <!-- 選択肢エリア -->
+            <div id="choices-container" class="grid grid-cols-1 gap-4 mb-4">
+                <!-- ボタンがここに挿入されます -->
+            </div>
+        </div>
+
+        <!-- リザルト画面 -->
+        <div id="result-screen"
+            class="hidden flex-1 flex flex-col items-center justify-center p-8 space-y-6 absolute inset-0 bg-white z-20 opacity-0 transition-opacity duration-500">
+            <div class="text-center">
+                <p id="result-date"
+                    class="text-lg font-bold text-slate-500 mb-4 bg-yellow-100 inline-block px-4 py-1 rounded-full border border-yellow-300">
+                    <!-- 日付 -->
+                </p>
+                <p class="text-slate-400 font-bold mb-2">今回のスコア</p>
+                <div class="text-6xl font-bold text-sky-500 flex items-baseline justify-center">
+                    <span id="score-display">0</span><span class="text-2xl text-slate-300 ml-1">/ <span
+                            id="result-total-q"></span></span>
+                </div>
+            </div>
+
+            <div id="result-message" class="text-2xl font-bold text-center text-slate-700 animate-pop">
+                <!-- メッセージ -->
+            </div>
+
+            <div class="w-full space-y-3 mt-8">
+                <button onclick="restartGame()"
+                    class="w-full min-h-[4rem] bg-sky-500 hover:bg-sky-400 text-white font-bold py-3 px-8 rounded-2xl text-xl sm:text-lg shadow-lg transform transition hover:-translate-y-1 btn-press flex items-center justify-center">
+                    もう一度挑戦
+                </button>
+                <button onclick="showSummary()"
+                    class="w-full min-h-[4rem] bg-slate-200 hover:bg-slate-300 text-slate-600 font-bold py-3 px-8 rounded-2xl text-xl sm:text-lg shadow-md transform transition hover:-translate-y-1 btn-press flex items-center justify-center">
+                    やめる（今日の記録を見る）
+                </button>
+            </div>
+        </div>
+
+        <!-- 最終成績（サマリー）画面 -->
+        <div id="summary-screen" class="hidden flex-1 flex flex-col p-6 z-30 absolute inset-0 bg-white overflow-y-auto">
+            <header class="text-center mb-6 mt-4">
+                <h2 class="text-2xl font-bold text-sky-600">あなたの学習きろく</h2>
+                <p class="text-slate-500 text-sm mt-1">よくがんばりました！</p>
+            </header>
+
+            <div class="space-y-4">
+                <!-- トライ回数 -->
+                <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-3xl">🎯</span>
+                        <span class="font-bold text-slate-700">トライ回数</span>
+                    </div>
+                    <div class="text-2xl font-bold text-indigo-600"><span id="sum-tries">0</span><span
+                            class="text-sm text-slate-500 ml-1">回</span></div>
+                </div>
+
+                <!-- 算数成績 -->
+                <div class="bg-sky-50 border border-sky-100 p-4 rounded-2xl">
+                    <div class="flex items-center space-x-3 mb-2">
+                        <span class="text-2xl">🔢</span>
+                        <span class="font-bold text-slate-700">算数の正解率</span>
+                    </div>
+                    <div class="flex justify-between items-end">
+                        <div class="text-sm text-slate-500">
+                            正解: <span id="sum-math-correct">0</span> / <span id="sum-math-total">0</span>
+                        </div>
+                        <div class="text-3xl font-bold text-sky-600"><span id="sum-math-rate">0</span><span
+                                class="text-xl ml-1">%</span></div>
+                    </div>
+                </div>
+
+                <!-- 漢字成績 -->
+                <div class="bg-rose-50 border border-rose-100 p-4 rounded-2xl">
+                    <div class="flex items-center space-x-3 mb-2">
+                        <span class="text-2xl">✍️</span>
+                        <span class="font-bold text-slate-700">漢字の正解率</span>
+                    </div>
+                    <div class="flex justify-between items-end">
+                        <div class="text-sm text-slate-500">
+                            正解: <span id="sum-kanji-correct">0</span> / <span id="sum-kanji-total">0</span>
+                        </div>
+                        <div class="text-3xl font-bold text-rose-600"><span id="sum-kanji-rate">0</span><span
+                                class="text-xl ml-1">%</span></div>
+                    </div>
+                </div>
+
+                <!-- 総合正解率 -->
+                <div class="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl mt-4">
+                    <div class="flex flex-col items-center justify-center py-2">
+                        <span class="text-sm font-bold text-emerald-700 mb-1">ぜんたいの正解率</span>
+                        <div class="text-5xl font-bold text-emerald-500"><span id="sum-total-rate">0</span><span
+                                class="text-2xl ml-1">%</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="resetToStart()"
+                class="w-full min-h-[4rem] bg-sky-500 hover:bg-sky-400 text-white font-bold py-3 px-8 rounded-2xl text-lg shadow-lg transform transition hover:-translate-y-1 mt-8 mb-4">
+                スタート画面にもどる
+            </button>
+            <button onclick="clearRecords()" class="w-full text-slate-400 text-sm underline pb-6">
+                記録をリセットする
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- 状態管理 ---
+        let questions = [];
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let stats = {
+            mathCorrect: 0,
+            mathTotal: 0,
+            kanjiCorrect: 0,
+            kanjiTotal: 0
+        };
+        const TOTAL_QUESTIONS = 15; // 算数5問 + 漢字10問
+
+        // --- 音声エフェクト ---
+        const AudioContextAPI = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContextAPI();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playTone(freq, type, duration, vol = 0.1) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.type = type;
+            osc.frequency.value = freq;
+
+            gain.gain.setValueAtTime(0, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function playCorrectSound() {
+            initAudio();
+            playTone(783.99, 'sine', 0.15, 0.2); // G5 (ピン)
+            setTimeout(() => playTone(659.25, 'sine', 0.4, 0.2), 150); // E5 (ポン)
+        }
+
+        function playIncorrectSound() {
+            initAudio();
+            playTone(150, 'square', 0.1, 0.03); // ブッ
+            setTimeout(() => playTone(150, 'square', 0.3, 0.03), 120); // ブー
+        }
+
+        function playPerfectSound() {
+            initAudio();
+            // ド・ミ・ソ・ドー（ファンファーレ風）
+            playTone(523.25, 'sine', 0.1, 0.2); // C5
+            setTimeout(() => playTone(659.25, 'sine', 0.1, 0.2), 150); // E5
+            setTimeout(() => playTone(783.99, 'sine', 0.1, 0.2), 300); // G5
+            setTimeout(() => playTone(1046.50, 'sine', 0.6, 0.2), 450); // C6
+        }
+
+        // --- 漢字データ (埋め込み) ---
+        // 外部ファイル読み込み不要
+        // --- 漢字データ (埋め込み) ---
+        // --- 漢字データ (API取得) ---
+        let fetchedKanjiData = [];
+
+        // カタカナをひらがなに変換するヘルパー
+        const toHiragana = (str) => {
+            return str.replace(/[\u30a1-\u30f6]/g, function (match) {
+                var chr = match.charCodeAt(0) - 0x60;
+                return String.fromCharCode(chr);
+            });
+        };
+
+        // 読み仮名の整形 ( "な.み" -> "なみ", "-が.ち" -> "がち" )
+        const cleanReading = (str) => {
+            return str.replace(/[\.-]/g, '');
+        };
+
+        // 漢字データをAPIから取得
+        // 1. Grade 6のリストを取得
+        // 2. ランダムにN個選ぶ
+        // 3. 詳細データを取得して整形
+        const fetchKanjiData = async (count = 5) => {
+            try {
+                // リスト取得 (5年生と6年生)
+                const [list5Resp, list6Resp] = await Promise.all([
+                    fetch('https://kanjiapi.dev/v1/kanji/grade-5'),
+                    fetch('https://kanjiapi.dev/v1/kanji/grade-6')
+                ]);
+
+                if (!list5Resp.ok || !list6Resp.ok) throw new Error('Failed to fetch list');
+
+                const list5 = await list5Resp.json();
+                const list6 = await list6Resp.json();
+                const list = [...list5, ...list6];
+
+                // ランダムに選出
+                const shuffledList = shuffle([...list]);
+                const targets = shuffledList.slice(0, count);
+
+                // 詳細データ取得 (並列)
+                const detailPromises = targets.map(kanji =>
+                    fetch(`https://kanjiapi.dev/v1/kanji/${encodeURIComponent(kanji)}`)
+                        .then(r => r.json())
+                );
+
+                const details = await Promise.all(detailPromises);
+
+                // クイズデータ生成
+                // 選択肢用の読み仮名プールを作成
+                let readingPool = [];
+                details.forEach(d => {
+                    if (d.kun_readings) readingPool.push(...d.kun_readings.map(cleanReading));
+                    if (d.on_readings) readingPool.push(...d.on_readings.map(r => toHiragana(cleanReading(r))));
+                });
+
+                return details.map(d => {
+                    // 正解候補: 訓読みがあればそれ、なければ音読み
+                    // 読み仮名の整形 ( "な.み" -> "なみ" )
+                    const kun = d.kun_readings ? d.kun_readings.map(cleanReading) : [];
+                    const on = d.on_readings ? d.on_readings.map(r => toHiragana(cleanReading(r))) : [];
+
+                    // この漢字の「正しい読み」全て (誤答に含まれないようにする)
+                    const validReadings = new Set([...kun, ...on]);
+
+                    // 正解候補: 訓読み・音読みの中からランダムに1つ選ぶ
+                    const candidates = [];
+
+                    if (d.kun_readings) {
+                        d.kun_readings.forEach(r => {
+                            candidates.push({ type: 'kun', raw: r, clean: cleanReading(r) });
+                        });
+                    }
+                    if (d.on_readings) {
+                        d.on_readings.forEach(r => {
+                            candidates.push({ type: 'on', raw: r, clean: toHiragana(cleanReading(r)) });
+                        });
+                    }
+
+                    // 候補がない場合はスキップ（通常ありえないが）
+                    if (candidates.length === 0) {
+                        candidates.push({ type: 'unknown', raw: '?', clean: '?' });
+                    }
+
+                    // ランダムに選択
+                    const selected = candidates[Math.floor(Math.random() * candidates.length)];
+
+                    let answer = selected.clean;
+                    let qHtml = d.kanji;
+
+                    // 訓読みで送り仮名がある場合の表示調整
+                    if (selected.type === 'kun') {
+                        if (selected.raw.includes('.')) {
+                            const parts = selected.raw.split('.');
+                            if (parts[1]) {
+                                qHtml += parts[1]; // 例: "並" + "ぶ" -> "並ぶ"
+                            }
+                        }
+                    }
+
+                    // 誤答の生成 (プールからランダムに3つ選ぶ)
+                    // 条件: この漢字の正しい読み(validReadings)に含まれないこと
+                    const wrongOptions = [];
+                    const maxRetries = 50;
+                    let retries = 0;
+                    while (wrongOptions.length < 3 && retries < maxRetries) {
+                        const r = readingPool[Math.floor(Math.random() * readingPool.length)];
+                        if (r && !validReadings.has(r) && !wrongOptions.includes(r)) {
+                            wrongOptions.push(r);
+                        }
+                        retries++;
+                    }
+                    // 万が一足りない場合のフォールバック
+                    while (wrongOptions.length < 3) {
+                        wrongOptions.push("???");
+                    }
+
+                    return {
+                        type: 'kanji',
+                        category: '漢字',
+                        qHtml: qHtml,
+                        a: answer,
+                        hint: null, // ヒントなし
+                        options: shuffle([answer, ...wrongOptions])
+                    };
+                });
+
+            } catch (e) {
+                console.error("API Error:", e);
+                alert("漢字データの取得に失敗しました。ネットワークを確認してください。");
+                return [];
+            }
+        };
+
+
+        // --- 算数ロジック ---
+
+        // ランダムな整数 (min <= n <= max)
+        const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+        // 配列をシャッフル
+        const shuffle = (array) => {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        };
+
+        // 分数表示用HTML生成
+        const fracHTML = (n, d) => `<span class="fraction"><span class="numerator">${n}</span><span class="denominator">${d}</span></span>`;
+
+        // 誤答生成ロジック (数値用)
+        const generateWrongOptions = (correctAns, isFloat = false) => {
+            const options = new Set([correctAns]);
+            while (options.size < 4) {
+                let offset = rand(-5, 5);
+                if (offset === 0) continue;
+
+                let wrong;
+                if (isFloat) {
+                    wrong = parseFloat((correctAns + offset * 0.1).toFixed(2));
+                } else {
+                    wrong = correctAns + offset;
+                }
+
+                // 負の数を避ける場合など条件追加可能だが、一旦シンプルに
+                if (wrong < 0) wrong = Math.abs(wrong);
+                options.add(wrong);
+            }
+            return shuffle(Array.from(options));
+        };
+
+        const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+
+        // 分数計算問題生成
+        const generateFractionQuestion = () => {
+            // 例: 1/3 + 1/6 = 1/2
+            // 答えが簡単になるように、答えから逆算する、あるいは簡単な分母を選ぶ
+            // a/b + c/d
+            const denominators = [2, 3, 4, 5, 6, 8, 10];
+            const d1 = denominators[rand(0, denominators.length - 1)];
+            const d2 = denominators[rand(0, denominators.length - 1)];
+            const n1 = rand(1, d1 - 1);
+            const n2 = rand(1, d2 - 1);
+
+            // 表示用
+            const qHtml = `${fracHTML(n1, d1)} + ${fracHTML(n2, d2)} = ?`;
+
+            // 計算
+            let commonD = d1 * d2;
+            let commonN = n1 * d2 + n2 * d1;
+            let divisor = gcd(commonN, commonD);
+            let ansN = commonN / divisor;
+            let ansD = commonD / divisor;
+
+            const ansStr = ansD === 1 ? `${ansN}` : fracHTML(ansN, ansD);
+
+            // 誤答生成: 分母を変えずに分子だけ変える、等
+            const wrongOpts = [];
+            while (wrongOpts.length < 3) {
+                const dummyN = rand(1, 20);
+                const dummyD = [ansD, d1, d2, commonD][rand(0, 3)];
+                // 簡易約分
+                let div = gcd(dummyN, dummyD);
+                let dN = dummyN / div;
+                let dD = dummyD / div;
+                let dummyStr = dD === 1 ? `${dN}` : fracHTML(dN, dD);
+
+                if (dummyStr !== ansStr && !wrongOpts.includes(dummyStr)) {
+                    wrongOpts.push(dummyStr);
+                }
+            }
+
+            return {
+                type: 'math',
+                category: '分数',
+                qHtml: qHtml,
+                a: ansStr,
+                options: shuffle([ansStr, ...wrongOpts])
+            };
+        };
+
+        // 小数計算問題
+        const generateDecimalQuestion = () => {
+            // 例: 1.2 x 3 = 3.6
+            const a = rand(11, 99) / 10; // 1.1 ~ 9.9
+            const b = rand(2, 9);
+            const isMult = Math.random() > 0.5;
+
+            let ans, qText;
+            if (isMult) {
+                ans = parseFloat((a * b).toFixed(1));
+                qText = `${a} × ${b}`;
+            } else {
+                // 足し算
+                const c = rand(11, 50) / 10;
+                ans = parseFloat((a + c).toFixed(1));
+                qText = `${a} + ${c}`;
+            }
+
+            return {
+                type: 'math',
+                category: '小数',
+                qHtml: `${qText} = ?`,
+                a: ans,
+                options: generateWrongOptions(ans, true)
+            };
+        };
+
+        // 割合・利益率
+        const generatePercentQuestion = () => {
+            const types = [
+                // AはBの何%？
+                () => {
+                    const base = rand(2, 20) * 10; // 20, 30, ... 200
+                    const rate = rand(1, 9) * 10; // 10%, 20%...
+                    const target = base * (rate / 100);
+                    return {
+                        q: `${base}円の${rate}%は？`,
+                        a: `${target}円`,
+                        wrong: [`${target * 10}円`, `${target + 50}円`, `${base - target}円`]
+                    };
+                },
+                // 割引
+                () => {
+                    const price = rand(10, 50) * 100; // 1000, 1100...
+                    const discount = rand(1, 5) * 10; // 10, 20...
+                    const ansPrice = price * (1 - discount / 100);
+                    return {
+                        q: `${price}円の${discount}%引きは？`,
+                        a: `${ansPrice}円`,
+                        wrong: [`${price - discount}円`, `${price * (discount / 100)}円`, `${ansPrice + 100}円`]
+                    };
+                }
+            ];
+
+            const qData = types[rand(0, types.length - 1)]();
+            return {
+                type: 'math',
+                category: '割合',
+                qHtml: qData.q,
+                a: qData.a,
+                options: shuffle([qData.a, ...qData.wrong])
+            };
+        };
+
+        const generateMathQuestions = () => {
+            const qList = [];
+            // 分数 2問
+            qList.push(generateFractionQuestion());
+            qList.push(generateFractionQuestion());
+            // 小数 1問
+            qList.push(generateDecimalQuestion());
+            // 割合 2問
+            qList.push(generatePercentQuestion());
+            qList.push(generatePercentQuestion());
+
+            return shuffle(qList);
+        };
+
+        // 旧: generateKanjiQuestions は削除され、fetchKanjiData に置き換わりました
+
+
+        // --- ゲーム進行制御 ---
+
+        function initGame(kanjiQuestions) {
+            questions = [
+                ...generateMathQuestions(),
+                ...kanjiQuestions
+            ];
+
+            currentQuestionIndex = 0;
+            score = 0;
+
+            // 今回のプレイの成績を初期化
+            stats = {
+                mathCorrect: 0,
+                mathTotal: 0,
+                kanjiCorrect: 0,
+                kanjiTotal: 0
+            };
+
+            renderQuestion();
+        }
+
+        async function startGame() {
+            initAudio(); // 最初のユーザーアクションで音声を有効化
+            const startBtn = document.querySelector('#start-screen button');
+            const originalText = startBtn.textContent;
+            startBtn.textContent = '読み込み中...';
+            startBtn.disabled = true;
+            startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            try {
+                // 漢字データ取得 (10問)
+                const kanjiQuestions = await fetchKanjiData(10);
+
+                // データが空ならエラー扱い
+                if (kanjiQuestions.length === 0) {
+                    throw new Error("No data");
+                }
+
+                initGame(kanjiQuestions);
+
+                document.getElementById('start-screen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('start-screen').classList.add('hidden');
+                    document.getElementById('result-screen').classList.add('hidden');
+                    document.getElementById('game-screen').classList.remove('hidden');
+                    document.getElementById('game-screen').style.opacity = '1';
+                }, 300);
+
+            } catch (e) {
+                alert("データの読み込みに失敗しました。もう一度お試しください。");
+                console.error(e);
+            } finally {
+                startBtn.textContent = originalText;
+                startBtn.disabled = false;
+                startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        function renderQuestion() {
+            const q = questions[currentQuestionIndex];
+
+            // プログレスバー更新
+            const totalQs = questions.length;
+            const progressPercent = ((currentQuestionIndex) / totalQs) * 100;
+            document.getElementById('progress-bar').style.width = `${progressPercent}%`;
+            document.getElementById('current-q').textContent = currentQuestionIndex + 1;
+            document.getElementById('total-q').textContent = totalQs;
+            document.getElementById('category-badge').textContent = q.category;
+
+            // 問題文表示
+            document.getElementById('question-text').innerHTML = q.qHtml;
+
+            // ヒント表示 (廃止)
+            const hintEl = document.getElementById('question-hint');
+            hintEl.classList.add('hidden');
+
+
+            // 選択肢生成
+            const choicesContainer = document.getElementById('choices-container');
+            choicesContainer.innerHTML = '';
+
+            q.options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full min-h-[4.5rem] bg-white border-2 border-slate-100 text-slate-600 font-bold py-4 px-4 rounded-2xl text-xl sm:text-2xl shadow-sm hover:border-sky-300 hover:text-sky-600 hover:bg-sky-50 transition-colors duration-200 relative overflow-hidden active:scale-[0.98] active:bg-sky-100 break-words flex items-center justify-center';
+
+                // タッチデバイスでの反応を良くする
+                btn.style.touchAction = 'manipulation';
+
+                btn.innerHTML = opt;
+                btn.onclick = () => checkAnswer(opt, q.a, btn);
+                choicesContainer.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(selected, correct, btnElement) {
+            // 現在の問題データを取得
+            const q = questions[currentQuestionIndex];
+
+            // 連打防止のためボタン無効化
+            const btns = document.querySelectorAll('#choices-container button');
+            btns.forEach(b => b.disabled = true);
+
+            const isCorrect = selected == correct; // 文字列比較
+
+            // フィードバック表示
+            const feedbackVal = document.getElementById('feedback');
+            const feedbackIcon = document.getElementById('feedback-icon');
+            feedbackVal.classList.remove('hidden');
+
+            if (isCorrect) {
+                playCorrectSound();
+                score++;
+
+                // カテゴリ別の正解数を記録
+                if (q.type === 'math') {
+                    stats.mathCorrect++;
+                } else if (q.type === 'kanji') {
+                    stats.kanjiCorrect++;
+                }
+
+                feedbackIcon.textContent = '⭕';
+                feedbackIcon.className = 'text-9xl drop-shadow-2xl filter text-emerald-400 animate-popup';
+                btnElement.className = 'w-full min-h-[4.5rem] bg-emerald-100 border-2 border-emerald-400 text-emerald-700 font-bold py-4 px-4 rounded-2xl text-xl sm:text-2xl shadow-none break-words flex items-center justify-center';
+                fireMatchFireworks(); // 正解時に花火発射！
+            } else {
+                playIncorrectSound();
+                feedbackIcon.textContent = '❌';
+                feedbackIcon.className = 'text-9xl drop-shadow-2xl filter text-rose-400 animate-popup';
+                btnElement.className = 'w-full min-h-[4.5rem] bg-rose-100 border-2 border-rose-400 text-rose-700 font-bold py-4 px-4 rounded-2xl text-xl sm:text-2xl shadow-none break-words flex items-center justify-center';
+
+                // 正解のボタンをハイライト
+                btns.forEach(b => {
+                    if (b.innerHTML == correct) {
+                        b.className = 'w-full min-h-[4.5rem] bg-emerald-50 border-2 border-emerald-300 text-emerald-600 font-bold py-4 px-4 rounded-2xl text-xl sm:text-2xl shadow-sm break-words flex items-center justify-center';
+                    }
+                });
+            }
+
+            // カテゴリ別の出題数を記録
+            if (q.type === 'math') {
+                stats.mathTotal++;
+            } else if (q.type === 'kanji') {
+                stats.kanjiTotal++;
+            }
+
+            // 次の問題へ
+            setTimeout(() => {
+                feedbackVal.classList.add('hidden');
+                currentQuestionIndex++;
+                if (currentQuestionIndex < TOTAL_QUESTIONS) {
+                    renderQuestion();
+                } else {
+                    showResult();
+                }
+            }, 1000);
+        }
+
+        function showResult() {
+            document.getElementById('game-screen').classList.add('hidden');
+            const resScreen = document.getElementById('result-screen');
+            resScreen.classList.remove('hidden');
+            // 少し遅らせてフェードイン
+            setTimeout(() => resScreen.style.opacity = '1', 50);
+
+            // ローカルストレージに記録を保存
+            saveRecords();
+
+            // 日付表示
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
+            document.getElementById('result-date').textContent = dateStr;
+
+            document.getElementById('score-display').textContent = score;
+            document.getElementById('result-total-q').textContent = questions.length;
+
+            const msgEl = document.getElementById('result-message');
+            const totalQs = questions.length;
+            if (score === totalQs) {
+                playPerfectSound(); // 達成感のあるファンファーレ
+                msgEl.textContent = '全問正解！すごい！！🎉';
+                msgEl.className = 'text-2xl font-bold text-center text-orange-500 animate-pop';
+                fireConfetti();
+            } else if (score >= totalQs - 2) {
+                msgEl.textContent = 'あと少し！おしい！💪';
+                msgEl.className = 'text-2xl font-bold text-center text-sky-600';
+            } else {
+                msgEl.textContent = '毎日コツコツ頑張ろう！🌱';
+                msgEl.className = 'text-2xl font-bold text-center text-slate-600';
+            }
+        }
+
+        function restartGame() {
+            document.getElementById('result-screen').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('result-screen').classList.add('hidden');
+                startGame();
+            }, 300);
+        }
+
+        // --- 記録管理 ---
+        const STORAGE_KEY = 'mathKanjiAppRecords';
+
+        function loadRecords() {
+            const data = localStorage.getItem(STORAGE_KEY);
+            if (data) {
+                return JSON.parse(data);
+            }
+            return {
+                tries: 0,
+                mathTotal: 0,
+                mathCorrect: 0,
+                kanjiTotal: 0,
+                kanjiCorrect: 0
+            };
+        }
+
+        function saveRecords() {
+            const records = loadRecords();
+            records.tries += 1;
+            records.mathTotal += stats.mathTotal;
+            records.mathCorrect += stats.mathCorrect;
+            records.kanjiTotal += stats.kanjiTotal;
+            records.kanjiCorrect += stats.kanjiCorrect;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+        }
+
+        function clearRecords() {
+            if (confirm("ほんとうに記録を消しますか？")) {
+                localStorage.removeItem(STORAGE_KEY);
+                showSummary(); // 画面更新
+            }
+        }
+
+        function showSummary() {
+            document.getElementById('result-screen').classList.add('hidden');
+            const summaryScreen = document.getElementById('summary-screen');
+            summaryScreen.classList.remove('hidden');
+
+            const records = loadRecords();
+
+            // 表示の更新
+            document.getElementById('sum-tries').textContent = records.tries;
+
+            document.getElementById('sum-math-correct').textContent = records.mathCorrect;
+            document.getElementById('sum-math-total').textContent = records.mathTotal;
+            const mathRate = records.mathTotal > 0 ? Math.round((records.mathCorrect / records.mathTotal) * 100) : 0;
+            document.getElementById('sum-math-rate').textContent = mathRate;
+
+            document.getElementById('sum-kanji-correct').textContent = records.kanjiCorrect;
+            document.getElementById('sum-kanji-total').textContent = records.kanjiTotal;
+            const kanjiRate = records.kanjiTotal > 0 ? Math.round((records.kanjiCorrect / records.kanjiTotal) * 100) : 0;
+            document.getElementById('sum-kanji-rate').textContent = kanjiRate;
+
+            const totalQ = records.mathTotal + records.kanjiTotal;
+            const totalC = records.mathCorrect + records.kanjiCorrect;
+            const totalRate = totalQ > 0 ? Math.round((totalC / totalQ) * 100) : 0;
+            document.getElementById('sum-total-rate').textContent = totalRate;
+        }
+
+        function resetToStart() {
+            document.getElementById('summary-screen').classList.add('hidden');
+            document.getElementById('start-screen').classList.remove('hidden');
+            document.getElementById('start-screen').style.opacity = '1';
+        }
+
+        // --- エフェクト ---
+        // 正解時の花火
+        function fireMatchFireworks() {
+            const count = 40;
+            const defaults = {
+                origin: { y: 0.5, x: 0.5 },
+                zIndex: 100
+            };
+
+            // 放射状に広がる花火
+            confetti(Object.assign({}, defaults, {
+                particleCount: count,
+                spread: 360,
+                startVelocity: 30,
+                colors: ['#FFD700', '#FFA500', '#00BFFF', '#FF69B4'], // カラフルに
+                scalar: 0.8,
+                gravity: 0.8,
+                ticks: 100
+            }));
+        }
+
+        function fireConfetti() {
+            const count = 200;
+            const defaults = {
+                origin: { y: 0.7 }
+            };
+
+            function fire(particleRatio, opts) {
+                confetti(Object.assign({}, defaults, opts, {
+                    particleCount: Math.floor(count * particleRatio)
+                }));
+            }
+
+            fire(0.25, { spread: 26, startVelocity: 55, });
+            fire(0.2, { spread: 60, });
+            fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+            fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+            fire(0.1, { spread: 120, startVelocity: 45, });
+        }
+
+        // デバッグ用: 直接ゲーム画面へ (本番では削除)
+        // startGame(); 
+    </script>
+</body>
+
+</html>
